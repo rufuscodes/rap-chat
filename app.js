@@ -12,7 +12,28 @@ const io = socketio(Server);
 app.use(express.static(path.join(__dirname, "public")));
 
 // Run when client connects
-io.on('connection', socket => { console.log('New Web Socket Connection...') });
+io.on('connection', socket => { 
+    console.log('New Web Socket Connection...') 
+    socket.emit('message', 'Welcome to RapChat!');
+
+    // Broadcast when a user connects
+    socket.broadcast.emit('message', 'A user has joined the chat');
+    console.log('A user has joined the chat');
+
+    //Runs when client disconnects
+    socket.on('disconnect', () => {
+        io.emit('message', 'A user has left the chat');
+        console.log('User has left the chat');
+    });
+
+    // listen for chatMessage
+    socket.on('chatMessage', (msg) => { 
+        console.log(msg);
+        io.emit('message', msg);
+    });
+
+
+});
 
 const PORT = 3000 || process.env.PORT;
 Server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
