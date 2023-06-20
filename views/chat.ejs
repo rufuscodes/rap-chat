@@ -1,45 +1,41 @@
+<!-- chat.ejs -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-      integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
-      crossorigin="anonymous"
-      referrerpolicy="no-referrer"
-    />
-    <link rel="stylesheet" href="./css/style.css" />
     <title>RapChat</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/qs@6.10.1/dist/qs.js"></script>
   </head>
   <body>
     <div class="chat-container">
       <header class="chat-header">
-        <h1><i class="fas fa-smile"></i> RapChat</h1>
+        <h1><i class="fas fa-smile"></i> ChatCord</h1>
         <a href="index.html" class="btn">Leave Room</a>
       </header>
       <main class="chat-main">
         <div class="chat-sidebar">
           <h3><i class="fas fa-comments"></i> Room Name:</h3>
-          <h2 id="room-name">JavaScript</h2>
+          <h2 id="room-name"></h2>
           <h3><i class="fas fa-users"></i> Users</h3>
           <ul id="users">
-            <li>Rufus</li>
-            <li>Mae</li>
-            <li>Mitch</li>
-            <li>Vincent</li>
-            <li>Cameron</li>
+            <% users.forEach(user => { %>
+            <li><%= user.username %></li>
+            <% }); %>
           </ul>
         </div>
-        <div class="chat-messages"></div>
+
+        <div class="chat-messages">
+          <!-- Messages will be added here -->
+        </div>
       </main>
       <div class="chat-form-container">
-        <form id="chat-form">
+        <form id="chat-form" action="/chat">
           <input
             id="msg"
             type="text"
-            placeholder="Enter Note"
+            placeholder="Enter Message"
             required
             autocomplete="off"
           />
@@ -47,7 +43,9 @@
         </form>
       </div>
     </div>
-    <script src="socket.io/socket.io.js"></script>
-    <script src="js/main.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qs@6.10.1/dist/qs.js"></script>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/main.js"></script>
   </body>
 </html>

@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>ChatCord</title>
+    <link rel="stylesheet" href="css/style.css" />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
@@ -11,16 +12,15 @@
       crossorigin="anonymous"
       referrerpolicy="no-referrer"
     />
-    <link rel="stylesheet" href="./css/style.css" />
-    <title>RapChat</title>
   </head>
   <body>
     <div class="join-container">
       <header class="join-header">
-        <h1><i class="fas fa-smile"></i> RapChat</h1>
+        <h1><i class="fas fa-smile"></i> ChatCord</h1>
       </header>
       <main class="join-main">
-        <form action="chat.html">
+<div class="form-control">
+        <form action="/chat" method="post">
           <div class="form-control">
             <label for="username">Username</label>
             <input
@@ -28,8 +28,13 @@
               name="username"
               id="username"
               placeholder="Enter username..."
+              value="<%= username %>"
               required
+              readonly
             />
+
+</div>
+
           </div>
           <div class="form-control">
             <label for="room">Room</label>
@@ -46,5 +51,9 @@
         </form>
       </main>
     </div>
+<script src="https://cdn.jsdelivr.net/npm/qs@6.10.1/dist/qs.js"></script>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/main.js"></script>
   </body>
 </html>
