@@ -50,7 +50,7 @@ if (chatForm && chatMessages && roomName && userList) {
         div.classList.add('message');
         div.innerHTML = `<p class="meta">${ message.username } <span>${ message.time }</span></p>
     <img src="${ message.profilePictureUrl }" alt="Profile Picture">
-    <p class="text">${ message.userID }</p>`;
+    <p class="text">${ message.text }</p>`;
         if (chatMessages) {
             chatMessages.appendChild(div);
         }

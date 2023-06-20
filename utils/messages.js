@@ -4,8 +4,8 @@ function formatMessage(userId, username, text, profilePictureUrl) {
     return {
         userId,
         username,
-        text,
         time: moment().format('h:mm a'),
+        text,
         profilePictureUrl,
     };
 }

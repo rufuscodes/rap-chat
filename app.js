@@ -10,7 +10,7 @@ const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const multer = require('multer');
 const AWS = require('aws-sdk');
-const { Sequelize, DataTypes } = require('sequelize');
+const { Sequelize } = require('sequelize');
 const bcrypt = require('bcryptjs');
 const User = require('./models/User');
 const Message = require('./models/Message');
@@ -31,8 +31,22 @@ const sequelize = new Sequelize('rapchat', 'postgres', 'null', {
   dialect: 'postgres',
 });
 
-User(sequelize, DataTypes);
-Message(sequelize, DataTypes);
+// Define models
+const userModel = User(sequelize);
+const messageModel = Message(sequelize);
+
+// Set up associations
+userModel.hasMany(messageModel, { foreignKey: 'userId' });
+messageModel.belongsTo(userModel, { foreignKey: 'userId' });
+
+// Sync models with the database
+sequelize.sync({ alter: true })
+  .then(() => {
+    console.log('Database connected');
+  })
+  .catch((error) => {
+    console.error('Unable to connect to the database:', error);
+  });
 
 const sessionStore = new SequelizeStore({
   db: sequelize,
@@ -52,7 +66,7 @@ app.use(passport.session());
 passport.use(new LocalStrategy(
   async (username, password, done) => {
     try {
-      const user = await sequelize.models.User.findOne({ where: { username } });
+      const user = await userModel.findOne({ where: { username } });
       if (!user) {
         return done(null, false, { message: 'Incorrect username.' });
       }
@@ -72,7 +86,7 @@ passport.serializeUser((user, done) => {
 
 passport.deserializeUser(async (id, done) => {
   try {
-    const user = await sequelize.models.User.findByPk(id);
+    const user = await userModel.findByPk(id);
     done(null, user);
   } catch (err) {
     done(err);
@@ -85,12 +99,45 @@ app.get('/', (req, res) => {
   res.render('index', { username: req.user ? req.user.username : '' });
 });
 
-app.get('/chat', (req, res) => {
+app.get('/chat', async (req, res) => {
   const { username, room } = req.query;
-  const roomUsers = getRoomUsers(room); // Assuming getRoomUsers returns the users in the room
-
-  res.render('chat', { username, room, users: roomUsers });
+  try {
+    const roomUsers = await getRoomUsers(room); // Fetch room users from the database
+    res.render('chat', { username, room, users: roomUsers });
+  } catch (error) {
+    console.error(error);
+    res.render('chat', { username, room, users: [] }); // Handle error by passing an empty array of users
+  }
 });
+
+app.post('/chat', async (req, res) => {
+  const { username, room } = req.body;
+
+  // Check if the username is empty
+  if (!username) {
+    return res.status(400).send('Username is required');
+  }
+
+  try {
+    // Check if the username is already taken
+    const existingUser = await User.findByUsername(username);
+    if (existingUser) {
+      return res.status(409).send('Username is already taken');
+    }
+
+    // Perform other necessary operations
+
+    // Redirect the user to the chat page with the provided username and room as query parameters
+    res.redirect(`/chat?username=${ encodeURIComponent(username) }&room=${ encodeURIComponent(room) }`);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+
+
+
 
 app.get('/signup', (req, res) => {
   res.render('signup');
@@ -102,15 +149,22 @@ app.get('/login', (req, res) => {
 
 app.post('/signup', async (req, res) => {
   const { username, password } = req.body;
-  await sequelize.models.User.create({ username, password });
-  res.redirect('/login');
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await userModel.create({ username, password: hashedPassword });
+    res.redirect('/login');
+  } catch (error) {
+    console.error(error);
+    res.redirect('/signup');
+  }
 });
 
 app.post('/login', passport.authenticate('local', {
-  successRedirect: '/',
+  successRedirect: '/chat',
   failureRedirect: '/login',
 }), (req, res) => {
-  req.session.username = req.user.username; // Store the username in the session
+  console.log('Login success:', req.user);
+  console.log('Login session:', req.session);
 });
 
 const upload = multer({ dest: 'uploads/' });
@@ -146,48 +200,50 @@ app.post('/upload-profile-picture', upload.single('profilePicture'), async (req,
   });
 });
 
-io.on('connection', socket => {
-  socket.on('joinRoom', ({ username, room }) => {
-    const user = userJoin(socket.id, username, room);
-    socket.join(user.room);
-    socket.emit('message', formatMessage(user.username, 'Welcome to the chat!'));
-    socket.broadcast
-      .to(user.room)
-      .emit('message', formatMessage(user.username, `${ user.username } has joined the chat`));
-
-    io.to(user.room).emit('roomUsers', {
-      room: user.room,
-      users: getRoomUsers(user.room),
-    });
-  });
-
-  socket.on('chatMessage', msg => {
-    const user = getCurrentUser(socket.id);
-    io.to(user.room).emit('message', formatMessage(user.username, msg));
-  });
-
-  socket.on('disconnect', () => {
-    const user = userLeave(socket.id);
-    if (user) {
-      io.to(user.room).emit('message', formatMessage(user.username, `${ user.username } has left the chat`));
+io.on('connection', (socket) => {
+  socket.on('joinRoom', async ({ userId, username, room }) => {
+    try {
+      const user = await userJoin(userId, username, room);
+      socket.join(user.room);
+      socket.emit('message', formatMessage(user.userId, user.username, 'Welcome to the chat!'));
+      socket.broadcast.to(user.room).emit('message', formatMessage(user.userId, user.username, `${ user.username } has joined the chat`));
 
       io.to(user.room).emit('roomUsers', {
         room: user.room,
-        users: getRoomUsers(user.room),
+        users: await getRoomUsers(user.room),
       });
+    } catch (error) {
+      console.error(error);
+    }
+  });
+
+  socket.on('chatMessage', async (msg) => {
+    try {
+      const user = getCurrentUser(socket.id);
+      const message = await messageModel.create({ content: msg, userId: user.userId });
+      io.to(user.room).emit('message', formatMessage(user.userId, user.username, message.content));
+    } catch (error) {
+      console.error(error);
+    }
+  });
+
+  socket.on('disconnect', async () => {
+    try {
+      const user = userLeave(socket.id);
+      if (user) {
+        io.to(user.room).emit('message', formatMessage(user.userId, user.username, `${ user.username } has left the chat`));
+
+        io.to(user.room).emit('roomUsers', {
+          room: user.room,
+          users: await getRoomUsers(user.room),
+        });
+      }
+    } catch (error) {
+      console.error(error);
     }
   });
 });
 
-app.post('/chat', (req, res) => {
-  const { username, room } = req.query;
-
-  // Emit the joinRoom event to the socket
-  io.emit('joinRoom', { username, room });
-
-  res.redirect(`/chat?username=${ username }&room=${ room }`); // Redirect to the chatroom page after joining the room
-});
-
 const PORT = 3000 || process.env.PORT;
 
-server.listen(PORT, () => console.log(`Server running on port ${ PORT } `));
+server.listen(PORT, () => console.log(`Server running on port ${ PORT }`));
